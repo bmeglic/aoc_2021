@@ -1,0 +1,239 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <list>
+#include <string>
+
+#define BOARD_ROW   1000
+#define BOARD_COL   1000
+
+struct Point
+{
+    int x;
+    int y;
+};
+
+class Line
+{
+    private:
+        Point start;
+        Point end;
+
+    protected:
+    public:
+        Line() { }
+        ~Line() { }
+
+        void setStartPoint(int x, int y)
+        {
+            this->start.x = x;
+            this->start.y = y;
+        }
+
+        void setEndPoint(int x, int y)
+        {
+            this->end.x = x;
+            this->end.y = y;
+        }
+
+        Point getStartPoint(void) { return this->start; }
+        Point getEndPoint(void) { return this->end; }
+};
+
+#define MIN(x, y) (x < y) ? x : y
+#define MAX(x, y) (x > y) ? x : y
+
+class Board
+{
+    private:
+        int board[BOARD_ROW][BOARD_COL] = { 0 };
+
+    protected:
+    public:
+        Board() { }
+        ~Board() { }
+
+        int drawLine(Line *line)
+        {
+            Point start = line->getStartPoint();
+            Point end = line->getEndPoint();
+            int sx = start.x;
+            int sy = start.y;
+            int ex = end.x;
+            int ey = end.y;
+
+            if (sx == ex) // vertical line
+            {
+                int sr = MIN(sy, ey);
+                int er = MAX(sy, ey);
+
+                fprintf(stdout, "v: %d; %d:%d\n", sx, sr, er);
+
+                for (int r = sr; r <= er; r++)
+                    board[r][sx]++;
+            }
+            else if (sy == ey) // horizontal line
+            {
+                int sc = MIN(sx, ex);
+                int ec = MAX(sx, ex);
+
+                fprintf(stdout, "h: %d; %d:%d\n", sy, sc, ec);
+
+                for (int c = sc; c <= ec; c++)
+                    board[sy][c]++;
+            }
+            else
+            {
+            /*
+                int sr = MIN(sy, ey);
+                int er = MAX(sy, ey);
+                int sc = MIN(sx, ex);
+                int ec = MAX(sx, ex);
+*/
+                int xinc = 1;
+                int yinc = 1;
+
+                if (sx > ex)
+                    xinc = -1;
+                if (sy > ey)
+                    yinc = -1;
+
+                fprintf(stdout, "d: %d:%d; %d:%d\n", sx, sy, ex, ey);
+                //fprintf(stdout, "d: %d:%d; %d:%d\n", sc, sr, ec, er);
+
+                int r, c;
+                for (r = sy, c = sx; r != ey, c != ex; r += yinc, c += xinc)
+                {
+                    board[r][c]++;
+                }
+                board[r][c]++;
+            }
+
+            return 0;
+        }
+
+        void print(void)
+        {
+            for (int r = 0; r < 10; r++)
+            {
+                for (int c = 0; c < 10; c++)
+                {
+                    if (board[r][c] > 0)
+                        fprintf(stdout, "%d", board[r][c]);
+                    else
+                        fprintf(stdout, ".");
+                }
+                fprintf(stdout, "\n");
+            }
+            fprintf(stdout, "\n");
+        }
+
+        int getOverlaps(void)
+        {
+            int overlaps = 0;
+
+            for (int r = 0; r < BOARD_ROW; r++)
+            {
+                for (int c = 0; c < BOARD_COL; c++)
+                {
+                    if (board[r][c] >= 2)
+                        overlaps++;
+                }
+            }
+
+            return overlaps;
+        }
+};
+
+std::list<Line *> lines;
+Board board;
+
+int parse(FILE *fp)
+{
+    char *line = NULL;
+    size_t linelen = 0;
+    ssize_t read;
+
+    while ((read = getline(&line, &linelen, fp)) != -1)
+    {
+        if (line[read-1] == '\n')
+        {
+            line[read-1] = '\0';
+            read--;
+        }
+
+        if ((*line == '\n') || (*line == '\0'))
+            continue;
+
+        int x1, y1, x2, y2;
+
+        int ret = sscanf(line, "%d,%d -> %d,%d", &x1, &y1, &x2, &y2);
+        if (ret != 4)
+        {
+            fprintf(stderr, "Error parsing input\n");
+            free(line);
+            return -1;
+        }
+
+        Line *line = new Line();
+        line->setStartPoint(x1, y1);
+        line->setEndPoint(x2, y2);
+
+        lines.push_back(line);
+    }
+    if (line != NULL)
+        free(line);
+
+    return 0;
+}
+
+
+int compute(void)
+{
+    std::list<Line *>::iterator it;
+
+    for (it = lines.begin(); it != lines.end(); it++)
+    {
+        Line *line = *it;
+
+        fprintf(stdout, "Line: %d:%d -> %d:%d\n", line->getStartPoint().x, line->getStartPoint().y, line->getEndPoint().x, line->getEndPoint().y);
+
+        board.drawLine(line);
+        board.print();
+    }
+
+    fprintf(stdout, "overlaps: %d\n", board.getOverlaps());
+
+    return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+    const char *f_inp;
+    FILE *fp = NULL;
+
+    if (argc >= 2)
+    {
+        f_inp = argv[1];
+    }
+    else
+    {
+        fprintf(stderr, "Provide input file.\n");
+        return 1;
+    }
+
+    fp = fopen(f_inp, "r");
+    if (fp == NULL)
+    {
+        fprintf(stderr, "Could not open file.\n");
+        return 1;
+    }
+
+    parse(fp);
+    compute();
+    fclose(fp);
+
+    return 0;
+}
