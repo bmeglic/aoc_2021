@@ -1,0 +1,397 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <list>
+#include <string>
+
+#define BOARD_COL   5
+#define BOARD_ROW   5
+
+
+
+class Sequence
+{
+    private:
+        bool parsed = false;
+        std::list<int> seqList;
+        std::list<int>::iterator seqListIt;
+
+    protected:
+    public:
+        Sequence()
+        {
+        }
+        ~Sequence()
+        {
+            seqList.clear();
+        }
+
+        int parseSequence(char *sequence)
+        {
+            char *tok;
+            const char *delim = ",";
+
+            tok = strtok(sequence, delim);
+            while (tok != NULL)
+            {
+                int seq = atoi(tok);
+                seqList.push_back(seq);
+
+                tok = strtok(NULL, delim);
+           }
+
+            this->parsed = true;
+            return 0;
+        }
+
+        void restartSequence(void)
+        {
+            seqListIt = seqList.begin();
+        }
+
+        int getNextSequence(void)
+        {
+            int val = -1;
+
+            if (seqListIt != seqList.end())
+                val = *seqListIt++;
+
+            return val;
+        }
+
+        bool isParsed(void) { return this->parsed; }
+
+};
+
+class Board
+{
+    private:
+        bool parsed = false;
+        int brd[BOARD_ROW][BOARD_COL] = {0};
+        int marked[BOARD_ROW][BOARD_COL] = {0};
+        int rowIdx = 0;
+        int id;
+
+    protected:
+    public:
+        Board(int id)
+        {
+            memset(brd, 0, sizeof(brd));
+            memset(marked, 0, sizeof(marked));
+            this->id = id;
+        }
+        ~Board()
+        {
+        }
+        int getId(void) { return this->id; }
+        int isParsed(void) { return this->parsed; }
+
+        int parseRow(char *row)
+        {
+            char *tok;
+            const char *delim = " ";
+            int colIdx = 0;
+
+            if (rowIdx == BOARD_ROW)
+            {
+                fprintf(stderr, "BOARD_ROW\n");
+                return -1;
+            }
+
+            tok = strtok(row, delim);
+            for (colIdx = 0; colIdx < BOARD_COL; colIdx++)
+            {
+                //fprintf(stdout, "tok: %s\n", tok);
+                if (tok == NULL)
+                {
+                    fprintf(stderr, "token null\n");
+                    return -1;
+                }
+
+                int val = atoi(tok);
+                brd[rowIdx][colIdx] = val;
+
+                tok = strtok(NULL, delim);
+            }
+
+            rowIdx++;
+            if (rowIdx == BOARD_ROW) {
+                parsed = true;
+            }
+            return 0;
+        }
+
+        int getFld(int row, int col)
+        {
+            return brd[row][col];
+        }
+
+        void markFld(int row, int col)
+        {
+            marked[row][col] = 1;
+        }
+
+        void markSequence(int seq)
+        {
+            for (int r = 0; r < BOARD_ROW; r++)
+            {
+                for (int c = 0; c < BOARD_COL; c++)
+                {
+                    int val = brd[r][c];
+                    if (val == seq)
+                    {
+                        fprintf(stdout, "found seq: %d; %d:%d\n", id, r, c);
+                        marked[r][c] = 1;
+                    }
+                }
+            }
+        }
+
+        bool isMarked(int row, int col)
+        {
+            return (marked[row][col] != 0) ? true : false;
+        }
+
+        uint32_t getSumOfUnmarked(void)
+        {
+            uint32_t sum = 0;
+
+            for (int r = 0; r < BOARD_ROW; r++)
+            {
+                for (int c = 0; c < BOARD_COL; c++)
+                {
+                    if (marked[r][c] == 0)
+                    {
+                        sum += brd[r][c];
+                    }
+                }
+            }
+
+            return sum;
+        }
+
+        bool isWinner(void)
+        {
+            bool isWinner;
+            int r, c;
+
+            for (r = 0; r < BOARD_ROW; r++)
+            {
+                isWinner = true;
+                for (c = 0; c < BOARD_COL; c++)
+                {
+                    if (marked[r][c] != 1)
+                    {
+                        isWinner = false;
+                        break;
+                    }
+                }
+
+                if (isWinner == true)
+                    return true;
+            }
+
+            for (c = 0; c < BOARD_COL; c++)
+            {
+                isWinner = true;
+                for (r = 0; r < BOARD_ROW; r++)
+                {
+                    if (marked[r][c] != 1)
+                    {
+                        isWinner = false;
+                        break;
+                    }
+                }
+
+                if (isWinner == true)
+                    return true;
+            }
+
+            return false;
+        }
+};
+
+Sequence sequence;
+std::list<Board *> boards;
+
+int parse(FILE *fp)
+{
+    char *line = NULL;
+    size_t linelen = 0;
+    ssize_t read;
+    int boardcnt = 1;
+
+    Board *brd = nullptr;
+
+    while ((read = getline(&line, &linelen, fp)) != -1)
+    {
+        if (line[read-1] == '\n')
+        {
+            line[read-1] = '\0';
+            read--;
+        }
+
+        if ((*line == '\n') || (*line == '\0'))
+            continue;
+
+        if (sequence.isParsed() == false)
+        {
+            sequence.parseSequence(line);
+            continue;
+        }
+
+        if (brd == nullptr)
+        {
+            fprintf(stdout, "creating new board: %d\n", boardcnt);
+            brd = new Board(boardcnt++);
+            boards.push_back(brd);
+        }
+
+        brd->parseRow(line);
+        if (brd->isParsed() == true) {
+            brd = nullptr;
+            fprintf(stdout, "isParsed\n");
+        }
+    }
+    if (line != NULL)
+        free(line);
+
+    return 0;
+}
+
+void print_marked(Board *brd)
+{
+    for (int r = 0; r < BOARD_ROW; r++)
+    {
+        for (int c = 0; c < BOARD_COL; c++)
+        {
+            //int val = brd->getFld(r, c);
+            bool val = brd->isMarked(r, c);
+
+            //fprintf(stdout, "\t_%u_", val);
+            fprintf(stdout, "\t_%c_", (val == true) ? 'x' : '_');
+        }
+
+        fprintf(stdout, "\n");
+    }
+}
+
+int compute(void)
+{
+    int seq;
+    std::list<Board *>::iterator it;
+    Board *winnerBoard = nullptr;
+
+    std::list<Board *> boards_rem = boards;
+
+    sequence.restartSequence();
+
+    seq = sequence.getNextSequence();
+    do
+    {
+        fprintf(stdout, "seq: %d\n", seq);
+
+        it = boards_rem.begin();
+        while (it != boards_rem.end())
+        {
+            Board *brd = *it;
+
+            fprintf(stdout, "processing %u, size: %lu\n", brd->getId(), boards_rem.size());
+            if ((seq == 13) || (seq == 16))
+                print_marked(brd);
+
+            brd->markSequence(seq);
+
+            fprintf(stdout, "processed %u, size: %lu\n", brd->getId(), boards_rem.size());
+            if ((seq == 13) || (seq == 16))
+                print_marked(brd);
+
+            if (brd->isWinner() == true)
+            {
+                fprintf(stdout, "we have a winner brdid: %d\n", brd->getId());
+                print_marked(brd);
+
+                if (boards_rem.size() == 1)
+                {
+                    fprintf(stdout, "break\n");
+                    winnerBoard = brd;
+                    break;
+                }
+                else
+                {
+                    fprintf(stdout, "erasing\n");
+                    boards_rem.erase(it++);
+                }
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        if (winnerBoard != nullptr)
+            break;
+
+        seq = sequence.getNextSequence();
+    }
+    while (seq != -1);
+
+    fprintf(stdout, "last standing winner: brdid: %d\n", winnerBoard->getId());
+
+    uint32_t res = winnerBoard->getSumOfUnmarked() * seq;
+    fprintf(stdout, "result: %u\n", res);
+
+    /*    for (it = boards.begin(); it != boards.end(); it++)
+    {
+        Board *brd = *it;
+        fprintf(stdout, "board %d:\n", brd->getId());
+
+        for (int r = 0; r < BOARD_ROW; r++)
+        {
+            for (int c = 0; c < BOARD_COL; c++)
+            {
+                //int val = brd->getFld(r, c);
+                bool val = brd->isMarked(r, c);
+
+                //fprintf(stdout, "\t_%u_", val);
+                fprintf(stdout, "\t_%c_", (val == true) ? 'x' : '_');
+            }
+
+            fprintf(stdout, "\n");
+        }
+
+    }
+*/
+    return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+    const char *f_inp;
+    FILE *fp = NULL;
+
+    if (argc >= 2)
+    {
+        f_inp = argv[1];
+    }
+    else
+    {
+        fprintf(stderr, "Provide input file.\n");
+        return 1;
+    }
+
+    fp = fopen(f_inp, "r");
+    if (fp == NULL)
+    {
+        fprintf(stderr, "Could not open file.\n");
+        return 1;
+    }
+
+    parse(fp);
+    compute();
+    fclose(fp);
+
+    return 0;
+}
