@@ -1,0 +1,155 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <list>
+#include <string>
+
+
+
+class Fish
+{
+    private:
+        int state;
+    protected:
+    public:
+        Fish(int initialState)
+        {
+            this->state = initialState;
+        }
+
+        int getState(void) { return this->state; }
+
+        Fish *nextGeneration(void)
+        {
+            if (this->state == 0)
+            {
+                this->state = 6;
+                Fish *newOffspring = new Fish(8);
+                return newOffspring;
+            }
+
+            this->state--;
+            return nullptr;
+        }
+};
+
+std::list<Fish *> fishes;
+
+int parse(FILE *fp)
+{
+    char *line = NULL;
+    size_t linelen = 0;
+    ssize_t read;
+
+    while ((read = getline(&line, &linelen, fp)) != -1)
+    {
+        if (line[read-1] == '\n')
+        {
+            line[read-1] = '\0';
+            read--;
+        }
+
+        if ((*line == '\n') || (*line == '\0'))
+            continue;
+
+
+        char *token = NULL;
+        const char *delim = ",";
+
+        token = strtok(line, delim);
+        while (token != NULL)
+        {
+            int initialState = atoi(token);
+            Fish *fish = new Fish(initialState);
+
+            fishes.push_back(fish);
+
+            token = strtok(NULL, delim);
+        }
+
+
+    }
+    if (line != NULL)
+        free(line);
+
+    return 0;
+}
+
+
+void printFishesState(void)
+{
+    std::list<Fish *>::iterator it;
+
+    fprintf(stdout, "Fishes state: ");
+    for (it = fishes.begin(); it != fishes.end(); it++)
+    {
+        Fish *fish = *it;
+
+        fprintf(stdout, "%d,", fish->getState());
+    }
+    fprintf(stdout, "\n");
+}
+
+int compute(void)
+{
+    std::list<Fish *>::iterator it;
+    int numGenerations = 256;
+
+    std::list<Fish *> newFishes;
+
+    for (int gen = 0; gen < numGenerations; gen++)
+    {
+        for (it = fishes.begin(); it != fishes.end(); it++)
+        {
+            Fish *fish = *it;
+            Fish *newFish = fish->nextGeneration();
+
+            if (newFish != nullptr)
+            {
+                newFishes.push_back(newFish);
+            }
+        }
+
+        for (it = newFishes.begin(); it != newFishes.end(); it++)
+        {
+            fishes.push_back(*it);
+        }
+        newFishes.clear();
+    }
+
+    //printFishesState();
+    fprintf(stdout, "Fishes count: %lu\n", fishes.size());
+
+    return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+    const char *f_inp;
+    FILE *fp = NULL;
+
+    if (argc >= 2)
+    {
+        f_inp = argv[1];
+    }
+    else
+    {
+        fprintf(stderr, "Provide input file.\n");
+        return 1;
+    }
+
+    fp = fopen(f_inp, "r");
+    if (fp == NULL)
+    {
+        fprintf(stderr, "Could not open file.\n");
+        return 1;
+    }
+
+    parse(fp);
+    compute();
+    fclose(fp);
+
+    return 0;
+}
