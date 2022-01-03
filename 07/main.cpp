@@ -1,0 +1,134 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <list>
+#include <string>
+
+
+std::list<uint32_t> positions;
+
+int parse(FILE *fp)
+{
+    char *line = NULL;
+    size_t linelen = 0;
+    ssize_t read;
+
+    while ((read = getline(&line, &linelen, fp)) != -1)
+    {
+        if (line[read-1] == '\n')
+        {
+            line[read-1] = '\0';
+            read--;
+        }
+
+        if ((*line == '\n') || (*line == '\0'))
+            continue;
+
+
+        char *token = NULL;
+        const char *delim = ",";
+
+        token = strtok(line, delim);
+        while (token != NULL)
+        {
+            int position = atoi(token);
+            positions.push_back(position);
+            token = strtok(NULL, delim);
+        }
+
+    }
+    if (line != NULL)
+        free(line);
+
+    return 0;
+}
+
+#define ABS(x) (x < 0) ? -x : x
+
+uint32_t calc_fuel_cost(uint32_t initialPosition)
+{
+    std::list<uint32_t>::iterator it;
+    uint32_t cost = 0;
+
+    for (it = positions.begin(); it != positions.end(); it++)
+    {
+        uint32_t pos = *it;
+        uint32_t diff;
+
+        if (pos > initialPosition)
+            diff = pos - initialPosition;
+        else
+            diff = initialPosition - pos;
+
+        for (int i = 1; i <= diff; i++)
+            cost += i;
+
+        //cost += diff;
+    }
+
+    return cost;
+}
+
+
+int compute(void)
+{
+    std::list<uint32_t>::iterator it;
+    uint32_t min = (uint32_t)-1, max = 0;
+
+    for (it = positions.begin(); it != positions.end(); it++)
+    {
+        uint32_t pos = *it;
+
+        fprintf(stdout, "pos: %u\n", pos);
+        if (pos < min)
+            min = pos;
+        if (pos > max)
+            max = pos;
+    }
+
+    fprintf(stdout, "min: %u, max: %u\n", min, max);
+
+
+    uint32_t min_fuel_cost = (uint32_t)-1;
+    for (uint32_t iter = min; iter < max; iter++)
+    {
+        uint32_t cost = calc_fuel_cost(iter);
+        if (cost < min_fuel_cost)
+            min_fuel_cost = cost;
+    }
+
+    fprintf(stdout, "min fuel cost: %u\n", min_fuel_cost);
+    
+    return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+    const char *f_inp;
+    FILE *fp = NULL;
+
+    if (argc >= 2)
+    {
+        f_inp = argv[1];
+    }
+    else
+    {
+        fprintf(stderr, "Provide input file.\n");
+        return 1;
+    }
+
+    fp = fopen(f_inp, "r");
+    if (fp == NULL)
+    {
+        fprintf(stderr, "Could not open file.\n");
+        return 1;
+    }
+
+    parse(fp);
+    compute();
+    fclose(fp);
+
+    return 0;
+}
